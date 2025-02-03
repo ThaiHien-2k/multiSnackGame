@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multiplayer Snake Game</title>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      /* align-items: center; */
+      height: 100vh;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    .game-container {
+      display: flex;
+      flex-direction: column;
+      /* align-items: center; */
+      width: 100%;
+      max-width: 1200px;
+      padding: 20px;
+    }
+
+    .game-board-container {
+      display: flex;
+      /* justify-content: space-between; */
+      width: 100%;
+    }
+
+    .game-board {
+      position: relative;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      width: 200px;
+    }
+
+    #controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 20px;
+    }
+
+    #game {
+      border: 1px solid black;
+      margin-left: 100px;
+    }
+
+    #players {
+      list-style: none;
+      padding-left: 0;
+      margin-top: 0;
+      text-align: left;
+      width: 100%;
+      margin-left: 100px;
+    }
+
+    .sidebar input,
+    .sidebar button,
+    #controls input,
+    #controls button {
+      margin-top: 10px;
+    }
+
+    button.hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="game-container">
+    <div class="game-board-container">
+      <div class="game-board">
+        <canvas id="game" width="600" height="400"></canvas>
+      </div>
+      <div class="sidebar">
+        <ul id="players"></ul>
+      </div>
+    </div>
+
+    <div id="controls">
+      <input type="text" id="name" placeholder="Enter your name" />
+      <input type="color" id="color" />
+      <button id="start-btn">Start Game</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scale = 20;
+    let snakes = [];
+    let players = [];
+    let food = {};
+
+    socket.on('players', (data) => {
+      players = data;
+      updatePlayerList();
+    });
+
+    socket.on('snakes', (data) => {
+      snakes = data;
+    });
+
+    socket.on('food', (data) => {
+      food = data;
+    });
+
+    socket.on('gameOver', (data) => {
+      console.log(data.message);
+      const startButton = document.getElementById('start-btn');
+      startButton.disabled = false;
+      startButton.classList.remove('hidden'); 
+    });
+
+    document.addEventListener('keydown', (e) => {
+      const validKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+      if (validKeys.includes(e.key)) {
+        const direction = e.key.replace('Arrow', '').toUpperCase();
+        socket.emit('changeDirection', direction);
+      }
+    });
+
+    document.getElementById('start-btn').addEventListener('click', () => {
+      const name = document.getElementById('name').value || `Player${players.length + 1}`;
+      const color = document.getElementById('color').value;  
+
+      socket.emit('newPlayer', { name, color });
+
+      const startButton = document.getElementById('start-btn');
+      startButton.disabled = true;
+      startButton.classList.add('hidden');
+
+      draw();
+    });
+
+    function updatePlayerList() {
+      const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+      const playersList = document.getElementById('players');
+      playersList.innerHTML = '';
+
+      sortedPlayers.forEach((player) => {
+        const li = document.createElement('li');
+        li.textContent = `${player.name}: ${player.score}`;
+        li.style.color = player.color;
+        playersList.appendChild(li);
+      });
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      snakes.forEach((snake) => {
+        snake.body.forEach((segment, index) => {
+          ctx.fillStyle = index === 0 ? snake.color : 'lightgray';  
+          ctx.fillRect(segment.x * scale, segment.y * scale, scale, scale);
+        });
+      });
+
+      ctx.fillStyle = 'red';
+      ctx.fillRect(food.x * scale, food.y * scale, scale, scale);
+
+      requestAnimationFrame(draw);
+    }
+  </script>
+</body>
+
+</html>
